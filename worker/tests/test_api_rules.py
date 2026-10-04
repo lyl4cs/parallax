@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-API = Path(__file__).resolve().parents[2] / "api" / "rules.py"
+API = Path(__file__).resolve().parents[2] / "dashboard" / "api" / "rules.py"
 ALICE, BOB = "alice-id", "bob-id"
 ACCOUNTS = {"a-lead": ALICE, "a-fol": ALICE, "b-fol": BOB}
 TOKENS = {"alice-jwt": ALICE, "bob-jwt": BOB}
