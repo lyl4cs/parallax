@@ -1,0 +1,22 @@
+[project]
+name = "parallax-worker"
+version = "0.2.0"
+description = "Trade-copying worker for Tradovate futures accounts"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+db = ["psycopg[binary]>=3.1"]
+live = ["websockets>=12"]
+dev = ["pytest>=8", "psycopg[binary]>=3.1", "websockets>=12"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["parallax"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

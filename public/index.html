@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parallax</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f12; --panel: #15181d; --line: #252a31; --text: #e6e8eb; --muted: #8a919b;
+    --ok: #3ccf91; --bad: #ff5c5c; --warn: #f0b429; --buy: #4da3ff; --sell: #ff8a4d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f6f7f9; --panel: #fff; --line: #e3e6ea; --text: #15181d; --muted: #646b75;
+            --ok: #12925c; --bad: #d63031; --warn: #b7791f; --buy: #1f6fd1; --sell: #c75a1a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 "IBM Plex Sans", system-ui, sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+  h1 { font-size: 18px; font-weight: 600; letter-spacing: .02em; margin: 0; }
+  h2 { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 10px; }
+  .mono, td, .stat b { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; overflow-x: auto; }
+  .wide { grid-column: 1 / -1; }
+  .stats { display: flex; gap: 28px; flex-wrap: wrap; }
+  .stat span { display: block; color: var(--muted); font-size: 12px; }
+  .stat b { font-size: 22px; font-weight: 500; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); } .warn { color: var(--warn); }
+  .buy { color: var(--buy); } .sell { color: var(--sell); } .muted { color: var(--muted); }
+  .flash { animation: flash 1.2s ease-out; }
+  @keyframes flash { from { background: color-mix(in srgb, var(--buy) 20%, transparent); } to { background: transparent; } }
+  button, input { font: inherit; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--text); padding: 6px 12px; }
+  button { cursor: pointer; } button:hover { border-color: var(--muted); }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); margin-right: 6px; }
+  .dot.live { background: var(--ok); }
+  #login { max-width: 360px; margin: 80px auto; display: grid; gap: 10px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Parallax</h1>
+    <div class="muted"><span id="live" class="dot"></span><span id="status">connecting</span>
+      <button id="signout" class="hidden" style="margin-left:12px">Sign out</button></div>
+  </header>
+
+  <form id="login" class="hidden">
+    <h2>Sign in</h2>
+    <input id="email" type="email" required placeholder="you@example.com" autocomplete="email">
+    <button type="submit">Email me a sign-in link</button>
+    <div id="login-msg" class="muted"></div>
+  </form>
+
+  <div id="app" class="grid hidden">
+    <section class="wide">
+      <h2>Copy latency, last 24h</h2>
+      <div class="stats">
+        <div class="stat"><span>copies</span><b id="lat-n">–</b></div>
+        <div class="stat"><span>p50</span><b id="lat-p50">–</b></div>
+        <div class="stat"><span>p95</span><b id="lat-p95">–</b></div>
+        <div class="stat"><span>p99</span><b id="lat-p99">–</b></div>
+        <div class="stat"><span>open copies</span><b id="open-n">–</b></div>
+      </div>
+      <p class="muted" style="margin:10px 0 0">Measured from the worker receiving a leader fill to the broker acknowledging the follower order.</p>
+    </section>
+
+    <section class="wide">
+      <h2>Positions: follower vs target</h2>
+      <table><thead><tr><th>Leader</th><th>Follower</th><th>Symbol</th><th>Leader net</th><th>Rule</th><th>Target</th><th>Follower net</th><th></th></tr></thead>
+        <tbody id="positions"></tbody></table>
+    </section>
+
+    <section>
+      <h2>Copy rules</h2>
+      <table><thead><tr><th>Leader</th><th>Follower</th><th>Rule</th><th></th></tr></thead>
+        <tbody id="rules"></tbody></table>
+    </section>
+
+    <section>
+      <h2>Live copies</h2>
+      <table><thead><tr><th>Time</th><th>Follower</th><th>Order</th><th>Status</th><th>ms</th></tr></thead>
+        <tbody id="feed"></tbody></table>
+    </section>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// Mirrors worker/parallax/sizing.py target_position(). Keep them in sync.
+function targetPosition(leaderNet, multiplier, cap) {
+  const scaled = leaderNet * multiplier;
+  let t = scaled === 0 ? 0 : Math.trunc(scaled + Math.sign(scaled) * 1e-9);
+  if (cap != null) t = Math.max(-cap, Math.min(cap, t));
+  return t;
+}
+
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => (n > 0 ? "+" : "") + n;
+const ms = (v) => (v == null ? "–" : Number(v).toFixed(1) + " ms");
+
+function row(cells, cls) {
+  const tr = document.createElement("tr");
+  if (cls) tr.className = cls;
+  for (const c of cells) {
+    const td = document.createElement("td");
+    if (c && typeof c === "object") { td.textContent = c.text; if (c.cls) td.className = c.cls; }
+    else td.textContent = c ?? "";
+    tr.appendChild(td);
+  }
+  return tr;
+}
+
+let sb, session, accounts = {};
+
+async function boot() {
+  const cfg = await fetch("/api/config").then((r) => r.json());
+  if (!cfg.supabaseUrl || !cfg.supabaseAnonKey) { $("status").textContent = "missing SUPABASE_URL / SUPABASE_ANON_KEY"; return; }
+  sb = supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+  ({ data: { session } } = await sb.auth.getSession());
+  sb.auth.onAuthStateChange((_e, s) => { session = s; render(); });
+  render();
+}
+
+function render() {
+  $("login").classList.toggle("hidden", !!session);
+  $("app").classList.toggle("hidden", !session);
+  $("signout").classList.toggle("hidden", !session);
+  if (session) { loadAll(); subscribe(); } else { $("status").textContent = "signed out"; }
+}
+
+$("login").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const { error } = await sb.auth.signInWithOtp({ email: $("email").value, options: { emailRedirectTo: location.href } });
+  $("login-msg").textContent = error ? error.message : "Check your email for the link.";
+});
+$("signout").addEventListener("click", () => sb.auth.signOut());
+
+async function loadAll() {
+  const [acc, rules, lpos, fpos, lat, open] = await Promise.all([
+    sb.from("accounts").select("id, broker_account, role"),
+    sb.from("copy_rules").select("id, leader_account_id, follower_account_id, multiplier, max_contracts, active"),
+    sb.from("leader_positions").select("*"),
+    sb.from("follower_positions").select("*"),
+    sb.from("copy_latency_24h").select("*").maybeSingle(),
+    sb.from("copy_events").select("id", { count: "exact", head: true }).in("status", ["pending", "failed"]),
+  ]);
+  const err = [acc, rules, lpos, fpos, lat].find((r) => r.error);
+  if (err) { $("status").textContent = err.error.message; return; }
+
+  accounts = Object.fromEntries(acc.data.map((a) => [a.id, a.broker_account]));
+  const name = (id) => accounts[id] || id.slice(0, 8);
+
+  const l = lat.data || {};
+  $("lat-n").textContent = l.copies ?? 0;
+  $("lat-p50").textContent = ms(l.p50_ms); $("lat-p95").textContent = ms(l.p95_ms); $("lat-p99").textContent = ms(l.p99_ms);
+  $("open-n").textContent = open.count ?? "–";
+  $("open-n").className = open.count ? "warn" : "";
+
+  const fnet = {};
+  for (const p of fpos.data) fnet[p.account_id + "|" + p.symbol] = p.net_qty;
+  const posBody = $("positions"); posBody.replaceChildren();
+  for (const r of rules.data.filter((r) => r.active)) {
+    for (const p of lpos.data.filter((p) => p.account_id === r.leader_account_id)) {
+      const target = targetPosition(p.net_qty, Number(r.multiplier), r.max_contracts);
+      const actual = fnet[r.follower_account_id + "|" + p.symbol] ?? 0;
+      const good = actual === target;
+      posBody.appendChild(row([name(r.leader_account_id), name(r.follower_account_id), p.symbol, fmt(p.net_qty),
+        ruleText(r), fmt(target), fmt(actual), { text: good ? "OK" : "DRIFT", cls: good ? "ok" : "bad" }]));
+    }
+  }
+  if (!posBody.children.length) posBody.appendChild(row([{ text: "No open leader positions", cls: "muted" }]));
+
+  const rulesBody = $("rules"); rulesBody.replaceChildren();
+  for (const r of rules.data) {
+    const tr = row([name(r.leader_account_id), name(r.follower_account_id), ruleText(r)], r.active ? "" : "muted");
+    const td = document.createElement("td");
+    const btn = document.createElement("button");
+    btn.textContent = r.active ? "Pause" : "Resume";
+    btn.onclick = () => toggleRule(r.id, !r.active, btn);
+    td.appendChild(btn); tr.appendChild(td); rulesBody.appendChild(tr);
+  }
+
+  const { data: recent } = await sb.from("copy_events").select("*").order("updated_at", { ascending: false }).limit(30);
+  $("feed").replaceChildren(...(recent || []).map(feedRow));
+}
+
+function ruleText(r) { return `${Number(r.multiplier)}x` + (r.max_contracts ? `, max ${r.max_contracts}` : ""); }
+
+function feedRow(e, flash) {
+  const statusCls = { placed: "ok", failed: "bad", pending: "warn", skipped: "muted" }[e.status];
+  return row([
+    new Date(e.updated_at).toLocaleTimeString(),
+    accounts[e.follower_account_id] || e.follower_account_id.slice(0, 8),
+    { text: e.status === "skipped" ? "–" : `${e.side} ${e.qty} ${e.symbol}`, cls: e.side },
+    { text: e.status + (e.error ? ` (${e.error.slice(0, 40)})` : ""), cls: statusCls },
+    e.latency_ms == null ? "" : Number(e.latency_ms).toFixed(1),
+  ], flash ? "flash" : "");
+}
+
+let channel;
+function subscribe() {
+  if (channel) return;
+  channel = sb.channel("copies")
+    .on("postgres_changes", { event: "*", schema: "public", table: "copy_events" }, (payload) => {
+      $("feed").prepend(feedRow(payload.new, true));
+      while ($("feed").children.length > 30) $("feed").lastChild.remove();
+      clearTimeout(subscribe.t); subscribe.t = setTimeout(loadAll, 400);   // refresh positions/latency
+    })
+    .subscribe((s) => {
+      const live = s === "SUBSCRIBED";
+      $("live").classList.toggle("live", live);
+      $("status").textContent = live ? "live" : s.toLowerCase();
+    });
+}
+
+async function toggleRule(id, active, btn) {
+  btn.disabled = true;
+  const res = await fetch("/api/rules", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ id, active }),
+  });
+  if (!res.ok) alert((await res.json()).error || "Failed");
+  await loadAll();
+}
+
+boot().catch((e) => { $("status").textContent = e.message; });
+</script>
+</body>
+</html>
