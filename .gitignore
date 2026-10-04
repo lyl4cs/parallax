@@ -1,7 +1,17 @@
-.env
-.env.local
+# Node (landing page)
+node_modules/
+dist/
+*.log
+.DS_Store
+
+# Python (worker)
 __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
+*.egg-info/
+
+# Secrets and local tooling
+.env
+.env.local
 .vercel/

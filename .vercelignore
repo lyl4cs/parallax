@@ -1,0 +1,11 @@
+node_modules
+.env
+.env.local
+*.log
+.DS_Store
+dist
+# Not part of the landing page deploy
+worker
+supabase
+dashboard
+.github

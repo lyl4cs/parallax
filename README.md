@@ -14,6 +14,16 @@ Dashboard (Vercel static) ◀─────────────────
 
 The worker is **not** on Vercel. Serverless functions time out, and a copier needs one WebSocket held open all session.
 
+## Repo layout
+
+| Path | What it is |
+|---|---|
+| `worker/` | Python copy engine, Tradovate client, tests. The core of the project. |
+| `supabase/migrations/` | Postgres schema |
+| `dashboard/` | Live dashboard + rules API. Deploy as its own Vercel project with **Root Directory = `dashboard`**. |
+| repo root (`index.html`, `src/`, `api/index.js`, `vite.config.js`) | Waitlist landing page (React + Vite), deployed on Vercel. Unchanged by the worker work. |
+| `server/`, `services/` | Earlier Node/Express prototype of the copier. Superseded by `worker/`. |
+
 ## How it stays correct
 
 | Problem | What handles it |
@@ -34,8 +44,8 @@ The worker is **not** on Vercel. Serverless functions time out, and a copier nee
 | Postgres schema, RLS, views, Realtime publication | Applied to real Postgres 16; constraints and row-level security tested as an `authenticated` user |
 | Tradovate client (`tradovate.py`) | Tested against a fake REST layer and a fake WebSocket server that follows Tradovate's documented protocol. **Never run against Tradovate itself.** |
 | Whole worker (`main.py`) | End-to-end test: real Postgres + fake Tradovate, fills in → orders out → DB state checked |
-| Vercel API (`api/rules.py`) | Auth and ownership checks tested over real HTTP with Supabase faked |
-| Dashboard (`public/index.html`) | JS syntax-checked; its sizing matches Python on 252 cases. **Never run against a live Supabase.** |
+| Vercel API (`dashboard/api/rules.py`) | Auth and ownership checks tested over real HTTP with Supabase faked |
+| Dashboard (`dashboard/public/index.html`) | JS syntax-checked; its sizing matches Python on 252 cases. **Never run against a live Supabase.** |
 | Latency | Instrumented (`copy_events.latency_ms`, `copy_latency_24h` view). **No real number exists yet.** |
 
 **119 tests total.** Run them:
@@ -54,7 +64,7 @@ python -m parallax.simulate                     # 500 random fills, then reconci
 2. **Tradovate API access.** Get API credentials for a demo login, and confirm the current cost and requirements first. Then work through the checklist at the top of `worker/parallax/tradovate.py`; it lists every field and behaviour the client assumes but hasn't been able to verify.
 3. **Worker.** Deploy `worker/` (Dockerfile) to Railway or Fly.io with the env vars in `.env.example`, `TRADOVATE_ENV=demo` and **`PARALLAX_DRY_RUN=1`**. Trade on the demo leader and watch the logs.
 4. Once the dry run looks right, set `PARALLAX_DRY_RUN=0`, still on demo.
-5. **Vercel.** Deploy the repo root. Set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
+5. **Vercel.** Create a *new* Vercel project from this repo with Root Directory set to `dashboard` (the existing project keeps serving the landing page). Set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
 6. **Measure.** After a session of demo trades, run `python -m parallax.report`. It prints p50/p95/p99 copy latency and checks every follower against its target (exits 1 on drift, so it works as a cron alert).
 
 ## Known limits
